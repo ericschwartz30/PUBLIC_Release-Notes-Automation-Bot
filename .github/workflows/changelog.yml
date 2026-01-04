@@ -1,0 +1,50 @@
+name: Generate Changelog
+
+on:
+  # Scheduled runs - uncomment to enable
+  # schedule:
+  #   - cron: '0 13 * * 1,3,5'  # Monday, Wednesday, Friday at 8am ET (1pm UTC)
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Start date (YYYY-MM-DD) - leave empty to use last run date'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv anthropic
+
+      - name: Run changelog bot
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          START_DATE: ${{ inputs.start_date }}
+        run: python changelog_bot.py
+
+      - name: Commit updated state file
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .changelog_state.json
+          git diff --staged --quiet || git commit -m "Update changelog state after run"
+          git push
